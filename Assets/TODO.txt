@@ -1,0 +1,9 @@
+Client:
+	-Connect to the server
+	-Fetch rooms
+	-Connect to the rooms
+	-Send data to the server, move and process response with previous movement validation
+
+Server:
+	-Create world
+	-Handle input events like moving and attack
