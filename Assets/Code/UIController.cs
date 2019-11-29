@@ -9,7 +9,7 @@ public class UIController : MonoBehaviour
         _FetchRoomsButton,
         _JoinToTheRoomButton;
     
-    private string endpoint = "ws://localhost:2567";
+    private string endpoint = "ws://192.168.1.164:2567";
     
     void Start()
     {

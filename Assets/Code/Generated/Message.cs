@@ -8,17 +8,17 @@
 using Colyseus.Schema;
 
 public class Message : Schema {
-	[Type(0, "number")]
-	public float num = 0;
+	[Type(0, "uint32")]
+	public uint stateNum = 0;
 
 	[Type(1, "number")]
-	public float dX = 0;
+	public float x = 0;
 
 	[Type(2, "number")]
-	public float dY = 0;
+	public float y = 0;
 
 	[Type(3, "number")]
-	public float dZ = 0;
+	public float z = 0;
 
 	[Type(4, "string")]
 	public string msg = "";

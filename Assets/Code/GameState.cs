@@ -12,4 +12,5 @@ public class GameState : MonoBehaviour
     public static IndexedDictionary<string, Player> Entities = new IndexedDictionary<string, Player>();
 
     public static Vector3 HeroVelocity;
+    public static uint CurrentCommand = 0;
 }

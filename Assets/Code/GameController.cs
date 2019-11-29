@@ -1,9 +1,13 @@
 ﻿using GameDevWare.Serialization;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using CnControls;
 
 public class GameController : MonoBehaviour
 {
+    public float Velocity = 0.1f;
+
     void Start()
     {
         JoinOrCreateRoom();
@@ -16,46 +20,64 @@ public class GameController : MonoBehaviour
                 
         if (isMovementHandle)
         {
-            msg.dX = GameState.HeroVelocity.x;
-            msg.dY = GameState.HeroVelocity.y;
-            msg.dZ = GameState.HeroVelocity.z;
+            msg.stateNum = GameState.CurrentCommand++;
+            Debug.Log(GameState._Room.SessionId);
+            Vector3 playerPos = GetPlayer(GameState._Room.SessionId).Cube.transform.position;
+
+            msg.x = playerPos.x + GameState.HeroVelocity.x;
+            msg.y = playerPos.y + GameState.HeroVelocity.y;
+            msg.z = playerPos.z + GameState.HeroVelocity.z;
+
+            SpeculativeMovement();
 
             GameState._Room.Send(msg);
         }
     }
 
+    Player GetPlayer(string key)
+    {
+        Player player;
+        GameState.Entities.TryGetValue(key, out player);
+
+        return player;
+    }
+
+    void SpeculativeMovement()
+    {
+        GetPlayer(GameState._Room.SessionId).Cube.transform.Translate(GameState.HeroVelocity);
+    }
+
     bool HandleMovement()
     {
         bool isMoved = false;
-        float velocity = 0.1f;
 
         GameState.HeroVelocity.Set(0, 0, 0);
 
-        if (Input.GetKey(KeyCode.D))
+        if (Input.GetKey(KeyCode.D) || CnInputManager.GetAxis("Horizontal") > 0)
         {
-            GameState.HeroVelocity.x = velocity;
+            GameState.HeroVelocity.x = Velocity;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.A))
+        if (Input.GetKey(KeyCode.A) || CnInputManager.GetAxis("Horizontal") < 0)
         {
-            GameState.HeroVelocity.x = -velocity;
+            GameState.HeroVelocity.x = -Velocity;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.W))
+        if (Input.GetKey(KeyCode.W) || CnInputManager.GetAxis("Vertical") > 0)
         {
-            GameState.HeroVelocity.z = velocity;
+            GameState.HeroVelocity.z = Velocity;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.S))
+        if (Input.GetKey(KeyCode.S) || CnInputManager.GetAxis("Vertical") < 0)
         {
-            GameState.HeroVelocity.z = -velocity;
+            GameState.HeroVelocity.z = -Velocity;
             isMoved = true;
         }
 
-        GameState.HeroVelocity = Vector3.ClampMagnitude(GameState.HeroVelocity, velocity);
+        GameState.HeroVelocity = Vector3.ClampMagnitude(GameState.HeroVelocity, Velocity);
 
         return isMoved;
     }
@@ -86,7 +108,15 @@ public class GameController : MonoBehaviour
         {
             var message = (Message)msg;
             Debug.Log("Received schema-encoded message:");
-            Debug.Log("message.num => " + message.num + ", message.str => " + message.msg);
+            Debug.Log("message.num => " + message.stateNum + ", message.str => " + message.msg);
+
+            Vector3 playerPos = GetPlayer(GameState._Room.SessionId).Cube.transform.position;
+            if(message.x == playerPos.x &&
+               message.y == playerPos.y &&
+               message.z == playerPos.z)
+            {
+                GameState.CurrentCommand = message.stateNum;
+            }
         }
         else
         {
@@ -110,13 +140,13 @@ public class GameController : MonoBehaviour
         player._Entity = entity;
         player.Cube = cube;
 
+        Debug.Log($"Added player with ssID: {key}");
         GameState.Entities.Add(key, player);
     }
 
     void OnEntityRemove(Entity entity, string key)
     {
-        Player player;
-        GameState.Entities.TryGetValue(key, out player);
+        Player player = GetPlayer(key);
         Destroy(player.Cube);
 
         GameState.Entities.Remove(key);
@@ -124,13 +154,17 @@ public class GameController : MonoBehaviour
 
     void OnEntityMove(Entity entity, string key)
     {
-        Player player;
-        GameState.Entities.TryGetValue(key, out player);
+        Player player = GetPlayer(key);
 
-        float dX = entity.x - player.Cube.transform.position.x;
-        float dY = entity.y - player.Cube.transform.position.y;
-        float dZ = entity.z - player.Cube.transform.position.z;
+        if(key != GameState._Room.SessionId || !IsPreviousSpeculativeMovementValid(entity.stateNum))
+        {
+            Vector3 realPos = new Vector3(entity.x, entity.y, entity.z);
+            player.Cube.transform.position = realPos;
+        }
+    }
 
-        player.Cube.transform.Translate(new Vector3(dX, dY, dZ));
+    bool IsPreviousSpeculativeMovementValid(uint commandNum)
+    {
+        return GameState.CurrentCommand >= commandNum;
     }
 }
