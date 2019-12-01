@@ -1,12 +1,12 @@
 ﻿using GameDevWare.Serialization;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using CnControls;
+using UnityEngine.SceneManagement;
 
 public class GameController : MonoBehaviour
 {
-    public float Velocity = 0.1f;
+    public float dP = 0.1f;
 
     void Start()
     {
@@ -17,7 +17,7 @@ public class GameController : MonoBehaviour
     {
         Message msg = new Message();
         bool isMovementHandle = HandleMovement();
-                
+
         if (isMovementHandle)
         {
             msg.stateNum = GameState.CurrentCommand++;
@@ -32,12 +32,36 @@ public class GameController : MonoBehaviour
 
             GameState._Room.Send(msg);
         }
+
+        // Move all entities toward their server position
+        foreach(KeyValuePair<string, object> entry in GameState.Entities)
+        {
+            object entity;
+            GameState.Entities.TryGetValue(entry.Key, out entity);
+            if(entry.Key != GameState._Room.SessionId && entity is Player)
+            {
+                Player player = (Player)entity;
+                Vector3 serverPos = new Vector3(player._Entity.x, player._Entity.y, player._Entity.z);
+                
+                if(serverPos != player.Cube.transform.position)
+                {
+                    Vector3 interpolatedPos = Vector3.Lerp(player.Cube.transform.position, serverPos, 0.1f);
+                    player.Cube.transform.position = interpolatedPos;
+                }
+            }
+        }
     }
 
     Player GetPlayer(string key)
     {
-        Player player;
-        GameState.Entities.TryGetValue(key, out player);
+        Player player = null;
+        object entity;
+        GameState.Entities.TryGetValue(key, out entity);
+
+        if(entity is Player)
+        {
+            player = (Player)entity;
+        }
 
         return player;
     }
@@ -55,29 +79,29 @@ public class GameController : MonoBehaviour
 
         if (Input.GetKey(KeyCode.D) || CnInputManager.GetAxis("Horizontal") > 0)
         {
-            GameState.HeroVelocity.x = Velocity;
+            GameState.HeroVelocity.x = dP;
             isMoved = true;
         }
 
         if (Input.GetKey(KeyCode.A) || CnInputManager.GetAxis("Horizontal") < 0)
         {
-            GameState.HeroVelocity.x = -Velocity;
+            GameState.HeroVelocity.x = -dP;
             isMoved = true;
         }
 
         if (Input.GetKey(KeyCode.W) || CnInputManager.GetAxis("Vertical") > 0)
         {
-            GameState.HeroVelocity.z = Velocity;
+            GameState.HeroVelocity.z = dP;
             isMoved = true;
         }
 
         if (Input.GetKey(KeyCode.S) || CnInputManager.GetAxis("Vertical") < 0)
         {
-            GameState.HeroVelocity.z = -Velocity;
+            GameState.HeroVelocity.z = -dP;
             isMoved = true;
         }
 
-        GameState.HeroVelocity = Vector3.ClampMagnitude(GameState.HeroVelocity, Velocity);
+        GameState.HeroVelocity = Vector3.ClampMagnitude(GameState.HeroVelocity, dP);
 
         return isMoved;
     }
@@ -96,7 +120,12 @@ public class GameController : MonoBehaviour
         PlayerPrefs.SetString("sessionId", GameState._Room.SessionId);
         PlayerPrefs.Save();
 
-        GameState._Room.OnLeave += (code) => Debug.Log("ROOM: ON LEAVE");
+        GameState._Room.OnLeave += (code) => 
+        {
+            SceneManager.LoadSceneAsync((int)GameState.Scenes.MainMenu);
+            Debug.Log("ROOM: ON LEAVE");
+        };
+
         GameState._Room.OnError += (message) => Debug.LogError(message);
         //room.OnStateChange += OnStateChangeHandler;
         GameState._Room.OnMessage += OnMessage;
@@ -113,7 +142,8 @@ public class GameController : MonoBehaviour
             Vector3 playerPos = GetPlayer(GameState._Room.SessionId).Cube.transform.position;
             if(message.x == playerPos.x &&
                message.y == playerPos.y &&
-               message.z == playerPos.z)
+               message.z == playerPos.z &&
+               message.stateNum > GameState.CurrentCommand)
             {
                 GameState.CurrentCommand = message.stateNum;
             }
@@ -131,7 +161,7 @@ public class GameController : MonoBehaviour
     {
         GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
 
-        //Debug.Log("Player add! x => " + entity.x + ", y => " + entity.y);
+        Debug.Log("Player add! x => " + entity.x + ", y => " + entity.y);
 
         cube.transform.position = new Vector3(entity.x, entity.y, entity.z);
 
@@ -146,6 +176,7 @@ public class GameController : MonoBehaviour
 
     void OnEntityRemove(Entity entity, string key)
     {
+        Debug.Log($"Deleting {key}");
         Player player = GetPlayer(key);
         Destroy(player.Cube);
 
@@ -156,10 +187,13 @@ public class GameController : MonoBehaviour
     {
         Player player = GetPlayer(key);
 
+        // If speculation for this client was valid then we do nothing :3
         if(key != GameState._Room.SessionId || !IsPreviousSpeculativeMovementValid(entity.stateNum))
         {
-            Vector3 realPos = new Vector3(entity.x, entity.y, entity.z);
-            player.Cube.transform.position = realPos;
+            player._Entity.stateNum = entity.stateNum;
+            player._Entity.x = entity.x;
+            player._Entity.y = entity.y;
+            player._Entity.z = entity.z;
         }
     }
 

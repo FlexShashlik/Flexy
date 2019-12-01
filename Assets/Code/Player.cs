@@ -2,6 +2,6 @@
 
 public class Player : MonoBehaviour
 {
-    public Entity _Entity { get; set; }
-    public GameObject Cube { get; set; }
+    public Entity _Entity;
+    public GameObject Cube;
 }

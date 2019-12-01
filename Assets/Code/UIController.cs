@@ -32,6 +32,6 @@ public class UIController : MonoBehaviour
             ConnectToTheHost();
         }
 
-        SceneManager.LoadSceneAsync(1);
+        SceneManager.LoadSceneAsync((int)GameState.Scenes.Game);
     }
 }
