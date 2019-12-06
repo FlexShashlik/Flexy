@@ -1,9 +1,7 @@
 ﻿using GameDevWare.Serialization;
 using System.Collections.Generic;
 using UnityEngine;
-using CnControls;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 class Message {
     public string command;
@@ -13,20 +11,20 @@ class Message {
 public class GameController : MonoBehaviour
 {
     public float dP = 0.1f;
-    public Button _CreateProjectileButton; 
+    public Joystick _MovementJoystick, _ProjectileJoystick;
+
+    private Vector2 lastProjectileJoystickPos = Vector2.zero;
 
     void Start()
     {
         JoinOrCreateRoom();
-        _CreateProjectileButton.onClick.AddListener(OnCreateProjectileButton);
     }
 
     void Update()
     {
         MovementMessage data = new MovementMessage();
-        bool isMovementHandle = HandleMovement();
 
-        if (isMovementHandle)
+        if (IsMovementHandle())
         {
             data.stateNum = GameState.CurrentCommand++;
             Debug.Log(GameState._Room.SessionId);
@@ -44,6 +42,13 @@ public class GameController : MonoBehaviour
             GameState._Room.Send(msg);
         }
 
+        if (IsProjectileThrown())
+        {
+            CreateProjectile(Mathf.Atan2(lastProjectileJoystickPos.y, lastProjectileJoystickPos.x));
+        }
+        
+        lastProjectileJoystickPos = new Vector2(_ProjectileJoystick.Horizontal, _ProjectileJoystick.Vertical);
+        
         // Move all entities toward their server position
         foreach(KeyValuePair<string, GameEntity> entry in GameState.Entities)
         {
@@ -73,31 +78,31 @@ public class GameController : MonoBehaviour
         GetGameEntity(GameState._Room.SessionId).obj.transform.Translate(dP);
     }
 
-    bool HandleMovement()
+    bool IsMovementHandle()
     {
         bool isMoved = false;
 
         GameState.HeroVelocity.Set(0, 0, 0);
 
-        if (Input.GetKey(KeyCode.D) || CnInputManager.GetAxis("Horizontal") > 0)
+        if (Input.GetKey(KeyCode.D) || _MovementJoystick.Horizontal > 0)
         {
             GameState.HeroVelocity.x = dP;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.A) || CnInputManager.GetAxis("Horizontal") < 0)
+        if (Input.GetKey(KeyCode.A) || _MovementJoystick.Horizontal < 0)
         {
             GameState.HeroVelocity.x = -dP;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.W) || CnInputManager.GetAxis("Vertical") > 0)
+        if (Input.GetKey(KeyCode.W) || _MovementJoystick.Vertical > 0)
         {
             GameState.HeroVelocity.z = dP;
             isMoved = true;
         }
 
-        if (Input.GetKey(KeyCode.S) || CnInputManager.GetAxis("Vertical") < 0)
+        if (Input.GetKey(KeyCode.S) || _MovementJoystick.Vertical < 0)
         {
             GameState.HeroVelocity.z = -dP;
             isMoved = true;
@@ -106,6 +111,35 @@ public class GameController : MonoBehaviour
         GameState.HeroVelocity = Vector3.ClampMagnitude(GameState.HeroVelocity, dP);
 
         return isMoved;
+    }
+
+    bool IsProjectileThrown()
+    {
+        if(lastProjectileJoystickPos != Vector2.zero)
+        {
+            if(_ProjectileJoystick.Horizontal * _ProjectileJoystick.Vertical == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void CreateProjectile(float angle)
+    {
+        Message message = new Message();
+        message.command = "create_projectile";
+        GameEntity p = GetGameEntity(GameState._Room.SessionId);
+        Projectile projectile = new Projectile();
+        projectile.x = p._Entity.x;
+        projectile.y = p._Entity.y;
+        projectile.z = p._Entity.z;
+        projectile.angle = angle;
+
+        message.data = projectile;
+
+        GameState._Room.Send(message);
     }
 
     public async void JoinOrCreateRoom()
@@ -241,21 +275,5 @@ public class GameController : MonoBehaviour
     bool IsPreviousSpeculativeMovementValid(uint commandNum)
     {
         return GameState.CurrentCommand >= commandNum;
-    }
-
-    void OnCreateProjectileButton()
-    {
-        Message message = new Message();
-        message.command = "create_projectile";
-        GameEntity p = GetGameEntity(GameState._Room.SessionId);
-        Projectile projectile = new Projectile();
-        projectile.x = p._Entity.x;
-        projectile.y = p._Entity.y;
-        projectile.z = p._Entity.z;
-        projectile.angle = Random.Range(0, 6.28319f); // Angle from 0 to 2pi
-
-        message.data = projectile;
-
-        GameState._Room.Send(message);
     }
 }
