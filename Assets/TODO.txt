@@ -11,4 +11,4 @@ Server:
 	 -Anti-cheat system
 
 -Calculate position on server, NOT on client :D
--Basic projectiles
++Basic projectiles

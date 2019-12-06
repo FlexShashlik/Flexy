@@ -47,17 +47,14 @@ public class GameController : MonoBehaviour
         // Move all entities toward their server position
         foreach(KeyValuePair<string, GameEntity> entry in GameState.Entities)
         {
-            GameEntity entity;
-            GameState.Entities.TryGetValue(entry.Key, out entity);
-            if(entry.Key != GameState._Room.SessionId && entity._Entity is User)
+            if(entry.Key != GameState._Room.SessionId)
             {
-                User user = (User)entity._Entity;
-                Vector3 serverPos = new Vector3(user.x, user.y, user.z);
+                Vector3 serverPos = new Vector3(entry.Value._Entity.x, entry.Value._Entity.y, entry.Value._Entity.z);
                 
-                if(serverPos != entity.obj.transform.position)
+                if(serverPos != entry.Value.obj.transform.position)
                 {
-                    Vector3 interpolatedPos = Vector3.Lerp(entity.obj.transform.position, serverPos, 0.1f);
-                    entity.obj.transform.position = interpolatedPos;
+                    Vector3 interpolatedPos = Vector3.Lerp(entry.Value.obj.transform.position, serverPos, 0.1f);
+                    entry.Value.obj.transform.position = interpolatedPos;
                 }
             }
         }
@@ -195,7 +192,6 @@ public class GameController : MonoBehaviour
             gameEntity._Entity = proj;
             gameEntity.obj = sphere;
         }
-
         
         Debug.Log($"Added entity with ID: {key}");
         GameState.Entities.Add(key, gameEntity);
@@ -231,6 +227,15 @@ public class GameController : MonoBehaviour
                 ((User)player._Entity).z = user.z;
             }
         }
+        else if(entity is Projectile)
+        {
+            Projectile proj = (Projectile)entity;
+            GameEntity gameEntity = GetGameEntity(key);
+
+            gameEntity._Entity.x = proj.x;
+            gameEntity._Entity.y = proj.y;
+            gameEntity._Entity.z = proj.z;
+        }
     }
 
     bool IsPreviousSpeculativeMovementValid(uint commandNum)
@@ -247,7 +252,7 @@ public class GameController : MonoBehaviour
         projectile.x = p._Entity.x;
         projectile.y = p._Entity.y;
         projectile.z = p._Entity.z;
-        projectile.angle = Random.Range(0, 360);
+        projectile.angle = Random.Range(0, 6.28319f); // Angle from 0 to 2pi
 
         message.data = projectile;
 
