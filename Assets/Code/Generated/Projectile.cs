@@ -7,8 +7,8 @@
 
 using Colyseus.Schema;
 
-public class User : Entity {
-	[Type(3, "uint32")]
-	public uint stateNum = 0;
+public class Projectile : Entity {
+	[Type(3, "number")]
+	public float angle = 0;
 }
 

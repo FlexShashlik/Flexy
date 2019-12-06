@@ -7,7 +7,7 @@
 
 using Colyseus.Schema;
 
-public class Message : Schema {
+public class MovementMessage : Schema {
 	[Type(0, "uint32")]
 	public uint stateNum = 0;
 

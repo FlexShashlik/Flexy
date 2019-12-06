@@ -8,16 +8,13 @@
 using Colyseus.Schema;
 
 public class Entity : Schema {
-	[Type(0, "uint32")]
-	public uint stateNum = 0;
-
-	[Type(1, "number")]
+	[Type(0, "number")]
 	public float x = 0;
 
-	[Type(2, "number")]
+	[Type(1, "number")]
 	public float y = 0;
 
-	[Type(3, "number")]
+	[Type(2, "number")]
 	public float z = 0;
 }
 

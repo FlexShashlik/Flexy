@@ -3,72 +3,77 @@ using System.Collections.Generic;
 using UnityEngine;
 using CnControls;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+class Message {
+    public string command;
+    public object data;
+}
 
 public class GameController : MonoBehaviour
 {
     public float dP = 0.1f;
+    public Button _CreateProjectileButton; 
 
     void Start()
     {
         JoinOrCreateRoom();
+        _CreateProjectileButton.onClick.AddListener(OnCreateProjectileButton);
     }
 
     void Update()
     {
-        Message msg = new Message();
+        MovementMessage data = new MovementMessage();
         bool isMovementHandle = HandleMovement();
 
         if (isMovementHandle)
         {
-            msg.stateNum = GameState.CurrentCommand++;
+            data.stateNum = GameState.CurrentCommand++;
             Debug.Log(GameState._Room.SessionId);
-            Vector3 playerPos = GetPlayer(GameState._Room.SessionId).Cube.transform.position;
+            Vector3 playerPos = GetGameEntity(GameState._Room.SessionId).obj.transform.position;
 
-            msg.x = playerPos.x + GameState.HeroVelocity.x;
-            msg.y = playerPos.y + GameState.HeroVelocity.y;
-            msg.z = playerPos.z + GameState.HeroVelocity.z;
+            data.x = playerPos.x + GameState.HeroVelocity.x;
+            data.y = playerPos.y + GameState.HeroVelocity.y;
+            data.z = playerPos.z + GameState.HeroVelocity.z;
 
-            SpeculativeMovement();
+            SpeculativeMovement(GameState.HeroVelocity);
 
+            Message msg = new Message();
+            msg.command = "movement";
+            msg.data = data;
             GameState._Room.Send(msg);
         }
 
         // Move all entities toward their server position
-        foreach(KeyValuePair<string, object> entry in GameState.Entities)
+        foreach(KeyValuePair<string, GameEntity> entry in GameState.Entities)
         {
-            object entity;
+            GameEntity entity;
             GameState.Entities.TryGetValue(entry.Key, out entity);
-            if(entry.Key != GameState._Room.SessionId && entity is Player)
+            if(entry.Key != GameState._Room.SessionId && entity._Entity is User)
             {
-                Player player = (Player)entity;
-                Vector3 serverPos = new Vector3(player._Entity.x, player._Entity.y, player._Entity.z);
+                User user = (User)entity._Entity;
+                Vector3 serverPos = new Vector3(user.x, user.y, user.z);
                 
-                if(serverPos != player.Cube.transform.position)
+                if(serverPos != entity.obj.transform.position)
                 {
-                    Vector3 interpolatedPos = Vector3.Lerp(player.Cube.transform.position, serverPos, 0.1f);
-                    player.Cube.transform.position = interpolatedPos;
+                    Vector3 interpolatedPos = Vector3.Lerp(entity.obj.transform.position, serverPos, 0.1f);
+                    entity.obj.transform.position = interpolatedPos;
                 }
             }
         }
     }
 
-    Player GetPlayer(string key)
+    GameEntity GetGameEntity(string key)
     {
-        Player player = null;
-        object entity;
+        GameEntity entity = null;
         GameState.Entities.TryGetValue(key, out entity);
 
-        if(entity is Player)
-        {
-            player = (Player)entity;
-        }
-
-        return player;
+        return entity;
     }
 
-    void SpeculativeMovement()
+    void SpeculativeMovement(Vector3 dP)
     {
-        GetPlayer(GameState._Room.SessionId).Cube.transform.Translate(GameState.HeroVelocity);
+        GetGameEntity(GameState._Room.SessionId).obj.transform.Translate(dP);
     }
 
     bool HandleMovement()
@@ -137,15 +142,22 @@ public class GameController : MonoBehaviour
         {
             var message = (Message)msg;
             Debug.Log("Received schema-encoded message:");
-            Debug.Log("message.num => " + message.stateNum + ", message.str => " + message.msg);
+            Debug.Log("message.command => " + message.command + ", message.data => " + message.data);
 
-            Vector3 playerPos = GetPlayer(GameState._Room.SessionId).Cube.transform.position;
-            if(message.x == playerPos.x &&
-               message.y == playerPos.y &&
-               message.z == playerPos.z &&
-               message.stateNum > GameState.CurrentCommand)
+            switch(message.command)
             {
-                GameState.CurrentCommand = message.stateNum;
+                case "movement":
+                    MovementMessage data = (MovementMessage)message.data;
+                    Vector3 playerPos = GetGameEntity(GameState._Room.SessionId).obj.transform.position;
+                    if (data.x == playerPos.x &&
+                        data.y == playerPos.y &&
+                        data.z == playerPos.z &&
+                        data.stateNum > GameState.CurrentCommand)
+                    {
+                        GameState.CurrentCommand = data.stateNum;
+                    }
+
+                    break;
             }
         }
         else
@@ -159,46 +171,86 @@ public class GameController : MonoBehaviour
 
     void OnEntityAdd(Entity entity, string key)
     {
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameEntity gameEntity = new GameEntity();
+        
+        if(entity is User)
+        {
+            User user = (User)entity;
+            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
 
-        Debug.Log("Player add! x => " + entity.x + ", y => " + entity.y);
+            Debug.Log("Player add! x => " + user.x + ", y => " + user.y);
 
-        cube.transform.position = new Vector3(entity.x, entity.y, entity.z);
+            cube.transform.position = new Vector3(user.x, user.y, user.z);
 
-        // add "player" to map of players
-        Player player = new Player();
-        player._Entity = entity;
-        player.Cube = cube;
+            gameEntity._Entity = user;
+            gameEntity.obj = cube;
+        }
+        else if(entity is Projectile)
+        {
+            Projectile proj = (Projectile)entity;
+            GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+            sphere.transform.position = new Vector3(proj.x, proj.y, proj.z);
+            
+            gameEntity._Entity = proj;
+            gameEntity.obj = sphere;
+        }
 
-        Debug.Log($"Added player with ssID: {key}");
-        GameState.Entities.Add(key, player);
+        
+        Debug.Log($"Added entity with ID: {key}");
+        GameState.Entities.Add(key, gameEntity);
     }
 
     void OnEntityRemove(Entity entity, string key)
     {
         Debug.Log($"Deleting {key}");
-        Player player = GetPlayer(key);
-        Destroy(player.Cube);
+
+        GameEntity gameEntity = GetGameEntity(key);
+
+        if(gameEntity.obj != null)
+        {
+            Destroy(gameEntity.obj);
+        }
 
         GameState.Entities.Remove(key);
     }
 
     void OnEntityMove(Entity entity, string key)
     {
-        Player player = GetPlayer(key);
-
-        // If speculation for this client was valid then we do nothing :3
-        if(key != GameState._Room.SessionId || !IsPreviousSpeculativeMovementValid(entity.stateNum))
+        if(entity is User)
         {
-            player._Entity.stateNum = entity.stateNum;
-            player._Entity.x = entity.x;
-            player._Entity.y = entity.y;
-            player._Entity.z = entity.z;
+            User user = (User)entity;
+            GameEntity player = GetGameEntity(key);
+
+            // If speculation for this client was valid then we do nothing :3
+            if(key != GameState._Room.SessionId || !IsPreviousSpeculativeMovementValid(user.stateNum))
+            {
+                ((User)player._Entity).stateNum = user.stateNum;
+                ((User)player._Entity).x = user.x;
+                ((User)player._Entity).y = user.y;
+                ((User)player._Entity).z = user.z;
+            }
         }
     }
 
     bool IsPreviousSpeculativeMovementValid(uint commandNum)
     {
         return GameState.CurrentCommand >= commandNum;
+    }
+
+    void OnCreateProjectileButton()
+    {
+        Message message = new Message();
+        message.command = "create_projectile";
+        GameEntity p = GetGameEntity(GameState._Room.SessionId);
+        Projectile projectile = new Projectile();
+        projectile.x = p._Entity.x;
+        projectile.y = p._Entity.y;
+        projectile.z = p._Entity.z;
+        projectile.angle = Random.Range(0, 360);
+
+        message.data = projectile;
+
+        GameState._Room.Send(message);
     }
 }

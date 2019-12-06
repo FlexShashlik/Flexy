@@ -10,4 +10,5 @@ Server:
 	+-Handle input events like moving and attack
 	 -Anti-cheat system
 
--Calculate position on server, NOT on client :D 
+-Calculate position on server, NOT on client :D
+-Basic projectiles

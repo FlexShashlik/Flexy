@@ -10,7 +10,7 @@ public class GameState : MonoBehaviour
 
     public static string CurrentRoomName = "demo";
 
-    public static IndexedDictionary<string, object> Entities = new IndexedDictionary<string, object>();
+    public static IndexedDictionary<string, GameEntity> Entities = new IndexedDictionary<string, GameEntity>();
 
     public static Vector3 HeroVelocity;
     public static uint CurrentCommand = 0;
