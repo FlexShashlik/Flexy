@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 class Message {
     public string command;
@@ -10,6 +11,8 @@ class Message {
 
 public class GameController : MonoBehaviour
 {
+    public Slider _HealthBar;
+
     public float dP = 0.1f;
     public Joystick _MovementJoystick, _ProjectileJoystick;
 
@@ -22,29 +25,35 @@ public class GameController : MonoBehaviour
 
     void Update()
     {
-        MovementMessage data = new MovementMessage();
+        // Fetch user info and display
+        _HealthBar.value = ((User)GetGameEntity(GameState._Room.SessionId)._Entity).health;
 
-        if (IsMovementHandle())
+        if(_HealthBar.value > 0)
         {
-            data.stateNum = GameState.CurrentCommand++;
-            Debug.Log(GameState._Room.SessionId);
-            Vector3 playerPos = GetGameEntity(GameState._Room.SessionId).obj.transform.position;
+            MovementMessage data = new MovementMessage();
 
-            data.x = playerPos.x + GameState.HeroVelocity.x;
-            data.y = playerPos.y + GameState.HeroVelocity.y;
-            data.z = playerPos.z + GameState.HeroVelocity.z;
+            if (IsMovementHandle())
+            {
+                data.stateNum = GameState.CurrentCommand++;
+                Debug.Log(GameState._Room.SessionId);
+                Vector3 playerPos = GetGameEntity(GameState._Room.SessionId).obj.transform.position;
 
-            SpeculativeMovement(GameState.HeroVelocity);
+                data.x = playerPos.x + GameState.HeroVelocity.x;
+                data.y = playerPos.y + GameState.HeroVelocity.y;
+                data.z = playerPos.z + GameState.HeroVelocity.z;
 
-            Message msg = new Message();
-            msg.command = "movement";
-            msg.data = data;
-            GameState._Room.Send(msg);
-        }
+                SpeculativeMovement(GameState.HeroVelocity);
 
-        if (IsProjectileThrown())
-        {
-            CreateProjectile(Mathf.Atan2(lastProjectileJoystickPos.y, lastProjectileJoystickPos.x));
+                Message msg = new Message();
+                msg.command = "movement";
+                msg.data = data;
+                GameState._Room.Send(msg);
+            }
+
+            if (IsProjectileThrown())
+            {
+                CreateProjectile(Mathf.Atan2(lastProjectileJoystickPos.y, lastProjectileJoystickPos.x));
+            }
         }
         
         lastProjectileJoystickPos = new Vector2(_ProjectileJoystick.Horizontal, _ProjectileJoystick.Vertical);
@@ -52,7 +61,12 @@ public class GameController : MonoBehaviour
         // Move all entities toward their server position
         foreach(KeyValuePair<string, GameEntity> entry in GameState.Entities)
         {
-            if(entry.Key != GameState._Room.SessionId)
+            if(entry.Value._Entity is User && ((User)entry.Value._Entity).health <= 0)
+            {
+                Destroy(entry.Value.obj);
+            }
+
+            if(entry.Value.obj != null && entry.Key != GameState._Room.SessionId)
             {
                 Vector3 serverPos = new Vector3(entry.Value._Entity.x, entry.Value._Entity.y, entry.Value._Entity.z);
                 
@@ -158,8 +172,8 @@ public class GameController : MonoBehaviour
 
         GameState._Room.OnLeave += (code) => 
         {
-            SceneManager.LoadSceneAsync((int)GameState.Scenes.MainMenu);
             Debug.Log("ROOM: ON LEAVE");
+            SceneManager.LoadSceneAsync((int)GameState.Scenes.MainMenu);
         };
 
         GameState._Room.OnError += (message) => Debug.LogError(message);
