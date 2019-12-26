@@ -1127,6 +1127,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _HealthBar: {fileID: 406817460}
+  _Explosion: {fileID: 100000, guid: 15ca5b8fa431dc04291a79cadcd19874, type: 3}
   dP: 0.1
   _MovementJoystick: {fileID: 111305159}
   _ProjectileJoystick: {fileID: 208774800}

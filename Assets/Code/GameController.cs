@@ -12,6 +12,7 @@ class Message {
 public class GameController : MonoBehaviour
 {
     public Slider _HealthBar;
+    public GameObject _Explosion;
 
     public float dP = 0.1f;
     public Joystick _MovementJoystick, _ProjectileJoystick;
@@ -25,6 +26,10 @@ public class GameController : MonoBehaviour
 
     void Update()
     {
+        // Do nothing if we don't connected
+        if(GameState._Room == null)
+            return;
+
         // Fetch user info and display
         _HealthBar.value = ((User)GetGameEntity(GameState._Room.SessionId)._Entity).health;
 
@@ -61,8 +66,9 @@ public class GameController : MonoBehaviour
         // Move all entities toward their server position
         foreach(KeyValuePair<string, GameEntity> entry in GameState.Entities)
         {
-            if(entry.Value._Entity is User && ((User)entry.Value._Entity).health <= 0)
+            if(entry.Value.obj != null && entry.Value._Entity is User && ((User)entry.Value._Entity).health <= 0)
             {
+                Instantiate(_Explosion, entry.Value.obj.transform.position, Quaternion.identity);
                 Destroy(entry.Value.obj);
             }
 
